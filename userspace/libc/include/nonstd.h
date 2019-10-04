@@ -6,6 +6,9 @@
 extern "C" {
 #endif
 
+extern int sharedRead(char* string, int length);
+extern int sharedWrite(char* string, int length);
+
 /**
  * Creates a new process.
  *

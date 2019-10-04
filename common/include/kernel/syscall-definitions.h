@@ -17,3 +17,5 @@
 #define sc_createprocess 191
 #define sc_trace 252
 
+#define sc_shmwrite 300
+#define sc_shmread 301

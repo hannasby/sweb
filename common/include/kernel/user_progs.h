@@ -4,6 +4,7 @@
 char const *user_progs[] = {
 // for reasons of automated testing
                             "/usr/shell.sweb",
+                            "/usr/shmSimple.sweb",
                             0
                            };
 
