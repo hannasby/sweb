@@ -15,6 +15,7 @@ extern "C" {
  *
  */ 
 extern int createprocess(const char* path, int sleep);
+extern int changeByte(const char* str);
 
 #ifdef __cplusplus
 }

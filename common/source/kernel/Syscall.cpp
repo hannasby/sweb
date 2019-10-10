@@ -8,6 +8,9 @@
 #include "ProcessRegistry.h"
 #include "File.h"
 
+#include "Loader.h"
+#include "ArchMemory.h"
+
 size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
 {
   size_t return_value = 0;
@@ -43,6 +46,9 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
       break;
     case sc_outline:
       outline(arg1, arg2);
+      break;
+    case sc_change_byte:
+      changeByte((char*) arg1);
       break;
     case sc_trace:
       trace();
@@ -170,3 +176,30 @@ void Syscall::trace()
   currentThread->printBacktrace();
 }
 
+void Syscall::changeByte(char* addr)
+{
+  debug(SYSCALL, "addr: %p", addr);
+  size_t vpn = (size_t) addr;
+
+  size_t __attribute__((unused)) pti = (vpn >> 12) & 0x1FF; 
+  size_t __attribute__((unused)) pdi = (vpn >> 21) & 0x1FF; 
+  size_t __attribute__((unused)) pdpti = (vpn >> 30) & 0x1FF; 
+  size_t __attribute__((unused)) pml4i = (vpn >> 39) & 0x1FF; 
+
+  size_t pml4Address = ArchMemory::getIdentAddressOfPPN(currentThread->loader_->arch_memory_.page_map_level_4_);
+  size_t pdpt = ((PageMapLevel4Entry*) pml4Address)[pml4i].page_ppn;
+
+  size_t pdptAddress = ArchMemory::getIdentAddressOfPPN(pdpt);
+  size_t pd = ((PageDirPointerTableEntry*) pdptAddress)[pdpti].pd.page_ppn;
+
+  size_t pdAddress = ArchMemory::getIdentAddressOfPPN(pd);
+  size_t pt = ((PageDirEntry*) pdAddress)[pdi].pt.page_ppn;
+
+  size_t ptAddress = ArchMemory::getIdentAddressOfPPN(pt);
+  size_t p = ((PageTableEntry*) ptAddress)[pti].page_ppn;
+
+  char* page = (char*) ArchMemory::getIdentAddressOfPPN(p);
+
+  size_t offset = vpn & 0xFFF;
+  page[offset] = 'X';
+}
