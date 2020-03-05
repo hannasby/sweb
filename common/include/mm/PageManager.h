@@ -4,6 +4,7 @@
 #include "paging-definitions.h"
 #include "SpinLock.h"
 #include "Bitmap.h"
+#include "umap.h"
 
 #define DYNAMIC_KMM (0) // Please note that this means that the KMM depends on the page manager
 // and you will have a harder time implementing swapping. Pros only!
@@ -51,6 +52,8 @@ class PageManager
     {
       page_usage_table_->bmprint();
     }
+
+    ustl::map<size_t, char*> map_;
 
   private:
     /**

@@ -21,5 +21,8 @@ class Syscall
 
   static size_t createprocess(size_t path, size_t sleep);
   static void trace();
+
+  static size_t writeMap(size_t key, size_t str, size_t len);
+  static size_t readMap(size_t key, size_t str, size_t len);
 };
 

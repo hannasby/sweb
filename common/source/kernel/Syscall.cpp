@@ -7,6 +7,7 @@
 #include "UserProcess.h"
 #include "ProcessRegistry.h"
 #include "File.h"
+#include "PageManager.h"
 
 size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
 {
@@ -48,7 +49,13 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
       trace();
       break;
     case sc_pseudols:
-      VfsSyscall::readdir((const char*) arg1);
+      VfsSyscall::readdir((const char*)arg1);
+      break;
+    case sc_map_read:
+      return_value = readMap(arg1, arg2, arg3);
+      break;
+    case sc_map_write:
+      return_value = writeMap(arg1, arg2, arg3);
       break;
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
@@ -170,3 +177,55 @@ void Syscall::trace()
   currentThread->printBacktrace();
 }
 
+Mutex mutex_map_("mutex_map_");
+
+size_t Syscall::writeMap(size_t key, size_t str, size_t len) 
+{
+  if (len > PAGE_SIZE || str == 0 || ((str >= USER_BREAK) || (str + len > USER_BREAK))) 
+  {
+    return -1ULL;
+  }
+
+  char buf[len];
+  memcpy((char*) buf, (char*) str, len);
+
+  // or MutexLock
+  mutex_map_.acquire();
+  auto it = PageManager::instance()->map_.find(key);
+  if (it != PageManager::instance()->map_.end()) 
+  {
+    mutex_map_.release();
+    return -1ULL;
+  }
+
+  char* str_2 = new char(len);
+  memcpy(str_2, (char*) buf, len);
+
+  PageManager::instance()->map_.insert({key, str_2});
+  mutex_map_.release();
+  return 0;
+}
+
+size_t Syscall::readMap(size_t key, size_t str, size_t len)
+{
+  if (len > PAGE_SIZE || str == 0 || ((str >= USER_BREAK) || (str + len > USER_BREAK))) 
+  {
+    return -1ULL;
+  }
+
+  mutex_map_.acquire();
+
+  auto it = PageManager::instance()->map_.find(key);
+  if (it == PageManager::instance()->map_.end()) 
+  {
+    mutex_map_.release();
+    return -1ULL;
+  }
+
+  char buf[len];
+  memcpy((char*) buf, (char*) it, len);
+  mutex_map_.release();
+
+  memcpy((char*) str, (char*) buf, len);
+  return 0;
+}
