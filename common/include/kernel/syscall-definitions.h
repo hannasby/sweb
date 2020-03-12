@@ -19,3 +19,5 @@
 
 #define sc_map_write 250
 #define sc_map_read 251
+
+#define sc_virtualmem 260

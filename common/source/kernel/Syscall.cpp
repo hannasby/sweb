@@ -1,13 +1,15 @@
-#include "offsets.h"
 #include "Syscall.h"
-#include "syscall-definitions.h"
-#include "Terminal.h"
-#include "debug_bochs.h"
-#include "VfsSyscall.h"
-#include "UserProcess.h"
-#include "ProcessRegistry.h"
 #include "File.h"
 #include "PageManager.h"
+#include "ProcessRegistry.h"
+#include "Terminal.h"
+#include "UserProcess.h"
+#include "VfsSyscall.h"
+#include "debug_bochs.h"
+#include "offsets.h"
+#include "syscall-definitions.h"
+#include "Loader.h"
+#include "ArchMemory.h"
 
 size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
 {
@@ -56,6 +58,9 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
       break;
     case sc_map_write:
       return_value = writeMap(arg1, arg2, arg3);
+      break;
+    case sc_virtualmem:
+      return_value = virtualMemTutorial((char*) arg1);
       break;
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
@@ -226,6 +231,45 @@ size_t Syscall::readMap(size_t key, size_t str, size_t len)
   memcpy((char*) buf, (char*) it, len);
   mutex_map_.release();
 
-  memcpy((char*) str, (char*) buf, len);
+  memcpy((char*) str, (char*)buf, len);
+  return 0;
+}
+
+size_t Syscall::virtualMemTutorial(char* str)
+{
+  debug(SYSCALL, "addr %p \n", str);
+  size_t vpn = (size_t) str;
+  
+  size_t pml4i = (vpn >> 39);
+  debug(SYSCALL, "pml4i %zd \n", pml4i);
+  size_t pml4Address = ArchMemory::getIdentAddressOfPPN(currentThread->loader_->arch_memory_.page_map_level_4_);
+  size_t ppn_pdpt = ((PageMapLevel4Entry*) pml4Address)[pml4i].page_ppn;
+  debug(SYSCALL, "ppn_pdpt %zd \n", ppn_pdpt);
+
+  size_t pdpti = (vpn >> 30) & 0x1FF;
+  debug(SYSCALL, "pdpti %zd \n", pdpti);
+  size_t pdptAddress = ArchMemory::getIdentAddressOfPPN(ppn_pdpt);
+  size_t ppn_pd = ((PageDirPointerTableEntry*) pdptAddress)[pdpti].pd.page_ppn;
+  debug(SYSCALL, "ppn_pd %zd \n", ppn_pd);
+
+  size_t pdi = (vpn >> 21) & 0x1FF; // 0000000000 1 1111 1111
+  debug(SYSCALL, "pdi %zd \n", pdi);
+  size_t pdAddress = ArchMemory::getIdentAddressOfPPN(ppn_pd);
+  size_t ppn_pt = ((PageDirEntry*)pdAddress)[pdi].pt.page_ppn;
+  debug(SYSCALL, "ppn_pt %zd \n", ppn_pt);
+
+  size_t pti = (vpn >> 12) & 0x1FF;
+  debug(SYSCALL, "pti %zd \n", pti);
+  size_t ptAddress = ArchMemory::getIdentAddressOfPPN(ppn_pt);
+  size_t page = ((PageTableEntry*)ptAddress)[pti].page_ppn;
+  debug(SYSCALL, "page %zd \n", page);
+
+  char* p = (char*) ArchMemory::getIdentAddressOfPPN(page);
+  size_t offset = vpn & 0xFFF; // 1111 1111 1111
+  debug(SYSCALL, "offset %zd \n", offset);
+  char x = p[offset];
+
+  debug(SYSCALL, "X %c \n", x);
+
   return 0;
 }
